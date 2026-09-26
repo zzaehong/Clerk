@@ -1,0 +1,8 @@
+{
+  "version": "0.157.0",
+  "source": "https://github.com/openai/codex/releases/tag/rust-v0.157.0",
+  "asset": "codex-app-server-package-x86_64-pc-windows-msvc.tar.gz",
+  "sha256": "5aeaec2ce000e0b5d1c9b3d5751bc47743f231a806f8f4084138aaf876b84b5b",
+  "license": "Apache-2.0",
+  "modifications": "none; original runtime package layout retained"
+}

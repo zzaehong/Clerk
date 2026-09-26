@@ -1,0 +1,10 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+.local/
+src-tauri/resources/codex/bin/
+src-tauri/resources/codex/codex-path/
+src-tauri/resources/codex/codex-resources/
+release/*.exe
+release/*.zip
