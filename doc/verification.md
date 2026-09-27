@@ -158,3 +158,70 @@ README에 rustup stable 설치, 동일 터미널에서 환경 적용, 로그인 
 Git에는 소스·문서·아이콘·잠금 파일·런타임 출처 및 라이선스를 포함한다. `node_modules`, `dist`, `.local`, Cargo 산출물, 다운로드한 Codex 실행 파일은 제외한다.
 
 다음 작업은 Windows GUI에서 테스트 폴더 선택 → 요청 → 승인 거부/허용 → 실제 파일 확인을 기록하는 것이다. 이어 로그인, 질문, 중지, 재연결 및 프로세스 정리를 확인하고, 핵심 시나리오가 확인된 뒤 P0와 문서 형식 검증을 진행한다. 전체 PoC 완료로 판정하지 않는다.
+
+
+## 12. GUI 디자인 정리 (2026-09-26)
+
+Apple [Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/)와 [macOS 디자인 가이드](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos/)를 참고해 기존 기능의 화면 표현을 수정했다. 네이티브 Apple UI 키트나 SF Symbols를 배포하는 방식이 아니라 시스템 글꼴, CSS 및 직접 작성한 SVG 아이콘을 사용한다.
+
+- 반투명 상단 도구 막대, 작업 폴더 패널, 시작 안내 화면, 대화 영역, 요청 입력 영역으로 시각적 위계 정리.
+- 중성 배경, 파란색 주요 동작, 일관된 여백·모서리·그림자 적용. 승인/질문과 오류 패널도 통일.
+- 시스템 다크 모드, 좁은 창 레이아웃, 키보드 포커스, 고대비·동작 감소·투명도 감소 설정 대응.
+- 기존 Bridge/네이티브 로직과 승인·질문·중지·로그인 동작 연결 유지. 새 패키지 의존성 없음.
+
+`npm test` 10개 및 `npm run build` 통과, `git diff --check` 통과. 이번 환경에는 브라우저 시각 검증 도구가 없어 실제 렌더링 및 Tauri GUI 조작은 미검증이다. 기존 Windows 설치 파일에는 이번 디자인이 반영되지 않으며, 사용하려면 데스크톱 앱을 다시 빌드해야 한다.
+
+## 13. 0.2.0 빌드 (2026-09-26)
+
+- 기존 디자인에서 버튼·비활성 버튼·summary의 명시적 CSS cursor 설정 3곳을 제거했다. 운영체제/브라우저의 기본 커서 동작을 사용한다.
+- 앱 설정, npm/Cargo 루트 패키지, 화면 표시, Bridge와 Windows probe의 클라이언트 버전을 0.2.0으로 맞췄다. 내장 Codex는 0.157.0을 유지했다.
+- README는 설치·로그인·작업 요청·문제 해결 중심으로 정리하고, 기존 개발 환경·구조·검증 절차는 [개발 안내](development.md)로 옮겼다.
+- `npm test`: 10개 통과. `npm run prepare:windows`: 내장 런타임의 고정 SHA-256 확인 통과.
+- `bash scripts/cross-build.sh`: 프런트엔드 빌드와 Windows x64 release 컴파일, NSIS 패키징 성공(종료 코드 0). 이번 설치 파일에는 현재 디자인과 커서 설정 제거가 반영되었다.
+- 산출물: `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/Clerk_0.2.0_x64-setup.exe`.
+- 버전 일치, 문서의 로컬 링크, 소스 및 생성 CSS의 cursor 설정 제거를 확인했다.
+- MSVC 런타임 PDB 누락에 따른 LNK4099 경고, 교차 빌드 및 서명 생략 경고가 있었다. 설치 파일은 서명되지 않았다.
+- 이번 버전의 Windows 실제 설치·GUI 렌더링·로그인부터 파일 생성까지의 전체 조작은 미검증이다. 이전 절의 검증 한계를 해결한 것으로 간주하지 않는다.
+
+## 14. Codex 권한 설정 상속 및 승인 설명 개선 (2026-09-26)
+
+- Clerk의 `thread/start`·`thread/resume`에서 `untrusted`·`user`·`workspace-write` 강제 지정을 제거했다. Codex가 해석하는 사용자·프로젝트·관리 정책과 기본값을 따르며, 사용자 설정 파일은 수정하지 않는다. `turn/start`에도 별도 권한 설정이나 승인 유도 지시를 넣지 않는다.
+- 파일 승인에서 항목 ID가 일치하는 `fileChange.changes`를 사용해 생성·삭제·수정·이동 경로와 원본 diff를 표시한다. 누락된 정보는 누락으로 표시하며, 원문 JSON은 접힌 상세 영역에 남겼다.
+- 명령 승인에서 요청 이유·명령·작업 폴더·서버가 해석한 읽기/목록/검색 작업·네트워크 목적지를 표시한다. 요청 필드가 없을 때는 일치하는 commandExecution 항목에서 보완한다. 셸 명령의 실제 삭제/수정 대상 파일을 추측하지 않는다.
+- 앱이 추가 승인을 만들거나 서버 요청을 자동 승인하지 않는다. 기존 승인 응답과 거부 동작은 유지한다. 기본 설정·프로젝트 신뢰 상태·관리 정책에 따라 승인 요청은 여전히 발생할 수 있으며, 다른 Codex 클라이언트와 완전히 동일한 빈도를 보장하지 않는다.
+- 수동 `scripts/smoke.mjs`는 승인 검증 목적에 한해 read-only/on-request/user를 명시한다. 실제 계정 기반 수동 검증은 이번에 실행하지 않았다.
+- `npm test`: 16개 통과. `npm run build` 및 `git diff --check` 통과. React 서버 렌더링으로 삭제/수정 경로·이유·버튼·정보 누락 안내·명령의 HTML 이스케이프 확인. 실제 GUI 클릭·승인 빈도는 미검증이다.
+- 근거: [공식 App Server 문서](https://learn.chatgpt.com/docs/app-server)의 승인 이벤트 흐름과 파일 변경 구조, 설치된 Codex에서 생성한 FileUpdateChange/PatchChangeKind 타입. 내장 런타임 버전은 변경하지 않았다.
+- `bash scripts/cross-build.sh` 재빌드 성공(종료 코드 0). 기존 `Clerk_0.2.0_x64-setup.exe`를 이번 승인 개선이 반영된 설치 파일로 교체했다. 교차 빌드·PDB 누락 경고가 있었으며 설치 파일은 미서명이다. Windows 설치·GUI 전체 조작은 미검증이다.
+
+## 15. 아이콘·사용량·설정·마크다운 채팅 (2026-09-27)
+
+- `assets/icon.png`로 `npm run tauri -- icon assets/icon.png`를 실행해 앱/설치 아이콘을 생성하고, 화면 로고와 favicon에도 적용했다. 원본 이미지는 수정하지 않았다.
+- 로그인 시 `account/rateLimits/read`, 이후 `account/rateLimits/updated`를 사용한다. Codex 버킷의 5시간/주간 남은 비율과 초기화 시간을 표시하며, 부분 갱신에서 다른 한도 창을 유지한다. 미제공·조회 실패를 100% 남음으로 표시하지 않는다. 계정 변경/연결 종료 후 오래된 조회 결과는 무시한다.
+- 설정에서 계정·플랜 조회, 공식 로그인/취소/로그아웃, Clerk 버전과 초기화 응답의 Codex userAgent 확인, 재연결을 지원한다. Windows 내장 Codex 자동 업데이트 기능은 없으며 설치 파일을 통한 갱신을 안내한다.
+- 사용자 요청은 전송 전에 대화에 추가한다. Codex 답변은 item ID별로 스트리밍하고 완료 본문으로 교체해 순서 역전과 중복을 방지한다. react-markdown/remark-gfm으로 제목·목록·표·체크리스트·코드 블록을 렌더링한다. 원시 HTML은 실행하지 않으며 원격 이미지는 설명으로 표시한다.
+- `npm test`: 23개 통과. `npm run build`, `git diff --check` 통과. 전송 계층 모의 테스트와 React 서버 렌더링으로 검증했으며 실제 계정 API는 자동 테스트에서 호출하지 않았다.
+- 근거: [OpenAI Docs의 App Server 문서](https://learn.chatgpt.com/docs/app-server)와 로컬 CLI에서 생성한 InitializeResponse/AccountRateLimitsUpdatedNotification 타입.
+- 이번 변경의 Windows 실제 설치, 실계정 로그인/로그아웃과 사용량 표시, 데스크톱 화면 조작은 미검증이다.
+- `bash scripts/cross-build.sh`: 종료 코드 0. 변경된 아이콘·UI가 포함된 `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/Clerk_0.2.0_x64-setup.exe`를 재생성했다. PDB 누락/교차 빌드 경고가 있으며 설치 파일은 미서명이다. 설치 성공이나 실제 GUI 동작을 검증한 결과는 아니다.
+
+## 16. Desktop Workspace 레이아웃과 PNG 아이콘 통일 (2026-09-27)
+
+- 최신 `doc/prompt.md`에 따라 왼쪽 Workspace(260px, 작은 데스크톱 240px), 가운데 Chat, 오른쪽 Status(240px, 작은 데스크톱 220px)로 재배치했다. 전체 너비 헤더와 중앙 폴더/사용량 카드를 제거했다.
+- 중앙은 대화·승인·질문·오류와 입력창으로 구성한다. `100dvh` Grid 안에서 `chat-scroll`만 스크롤하고 입력창은 별도 하단 영역에 유지한다. 메시지 폭은 최대 860px다. 긴 설정 내용은 오른쪽 사이드바 안에서 스크롤된다.
+- 980px 이하에서는 오른쪽, 720px 이하에서는 왼쪽도 접힌다. 버튼과 배경 클릭으로 열고 닫으며 추가 내비게이션 라이브러리는 없다.
+- 원래 File Tree 구현이 없었다. 새 파일 관리 기능을 추가하지 말라는 제한을 따라 Files 영역에는 미지원 안내를 두었다. 실제 File Tree 표시 완료로 간주하지 않는다.
+- 기존 액션 함수 전체를 수정 전과 TypeScript AST로 비교하여 동일함을 확인했다. `npm test` 23개 통과, 프런트엔드 빌드 통과. React 서버 렌더링으로 Workspace/Status 배치·중앙에서 사용량/설정 제거·입력창 영역·PNG 로고 2개를 확인했다. 미리보기는 `.local/layout-review.html`에 저장했다. 화면 픽셀·실제 스크롤·사이드바 클릭 동작은 아직 GUI에서 확인하지 않았다.
+- `assets/icon.svg`를 삭제하고 시작 화면도 `assets/icon.png`로 교체했다. 창 아이콘을 PNG 파생 `src-tauri/icons/icon.png`로 명시 지정했다. Windows 실행 파일/설치 파일에 필요한 ICO는 같은 PNG에서 생성한 기존 파생 파일을 사용한다. 폴더·전송 등 기능 버튼의 벡터 아이콘은 앱 로고와 별개로 유지한다. 새 의존성은 없다.
+- `bash scripts/cross-build.sh`: 종료 코드 0. 새 3열 UI와 명시적 PNG 창 아이콘을 포함하는 `Clerk_0.2.0_x64-setup.exe` 재생성 완료. 기존과 같은 PDB 누락/교차 빌드 경고가 있으며 설치 파일은 미서명이다. Windows 설치·실계정·화면 조작은 이번에 수행하지 않았다.
+
+## 17. 0.3.0 Windows 아이콘 패키징 수정 (2026-09-27)
+
+- 기존 0.2.0 실행 파일의 PE 아이콘은 PNG 파생 ICO와 6/6 프레임 일치했지만, 0.2.0 설치 파일은 0/6이었다. 생성된 `installer.nsi`의 `INSTALLERICON`·`UNINSTALLERICON`도 빈 문자열이었다. 확인된 결함은 SVG 포맷 문제가 아니라 설치/제거 프로그램의 별도 아이콘 설정 누락이다. 사용자의 실제 Windows 표시 문제 전체를 이 원인만으로 확정하지는 않는다.
+- NSIS `installerIcon`·`uninstallerIcon`을 `icons/icon.ico`로 명시했다. `build.rs`에서 Windows PE 아이콘 경로를 명시하고 원본 PNG·파생 PNG/ICO 변경을 Cargo 재빌드 대상으로 등록했다. npm prebuild/predev에서 원본 PNG로 아이콘을 자동 재생성한다. 원본 디자인은 변경하지 않았다.
+- 앱·패키지·Cargo·Tauri·Bridge·화면 버전과 현재 설치 안내를 0.3.0으로 갱신했다. 내장 Codex 버전은 유지했다.
+- `npm test`: 23개 통과. 프런트엔드 빌드 통과. 기존 설치 파일을 검사했을 때 아이콘 불일치를 검출한 `scripts/verify-windows-icons.py`를 추가했다.
+- 참고: [Tauri App Icons](https://v2.tauri.app/develop/icons/), [NSIS 설정](https://v2.tauri.app/reference/config/#nsisconfig).
+- `bash scripts/cross-build.sh`: 종료 코드 0. `Clerk_0.3.0_x64-setup.exe` 생성 완료. PE 리소스 검사 결과 앱 실행 파일과 설치 파일 모두 원본 파생 ICO의 6/6 프레임이 SHA-256 기준 일치했다. 생성된 NSIS 스크립트의 설치·제거 아이콘 경로도 모두 `icons/icon.ico`를 가리킨다. 제거 프로그램은 설치 후 별도 추출 검증하지 않았다.
+- 설치 파일 SHA-256: `98774102c82fd4fbc5b3c8e0d01ac6c3240501f1a4c1072d2da56ed42ba97878`.
+- `git diff --check` 통과. 기존과 같은 PDB 누락/교차 빌드 경고가 있으며 설치 파일은 미서명이다. Windows 실제 설치·탐색기/작업 표시줄 아이콘 표시와 바로가기 갱신은 미검증이다. 해당 PC의 아이콘 캐시 문제 여부도 이번 결과만으로 확인하지 않았다.

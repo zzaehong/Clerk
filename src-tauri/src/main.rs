@@ -100,6 +100,12 @@ fn platform() -> &'static str { std::env::consts::OS }
 fn main() {
     let app = tauri::Builder::default().plugin(tauri_plugin_dialog::init()).plugin(tauri_plugin_opener::init())
         .manage(Runtime::default())
+        .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                window.set_icon(tauri::include_image!("icons/icon.png"))?;
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![start_codex, write_codex, stop_codex, choose_folder, open_login_url, platform])
         .build(tauri::generate_context!()).expect("Clerk 초기화 실패");
     app.run(|app, event| { if let tauri::RunEvent::Exit = event { app.state::<Runtime>().stop(); } });

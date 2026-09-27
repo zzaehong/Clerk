@@ -28,7 +28,7 @@ try {
             }
         }
     }
-    $init = Request 1 'initialize' @{clientInfo=@{name='clerk_probe';version='0.1.0'};capabilities=@{experimentalApi=$true}}
+    $init = Request 1 'initialize' @{clientInfo=@{name='clerk_probe';version='0.3.0'};capabilities=@{experimentalApi=$true}}
     $p.StandardInput.WriteLine('{"method":"initialized","params":{}}')
     $account = Request 2 'account/read' @{}
     $sandbox = Request 3 'windowsSandbox/readiness' @{}

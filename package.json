@@ -1,6 +1,6 @@
 {
   "name": "clerk",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,12 +9,17 @@
     "test": "node --experimental-strip-types --test --test-isolation=none tests/*.test.ts",
     "tauri": "tauri",
     "prepare:windows": "node scripts/prepare-windows.mjs",
-    "build:windows": "npm run prepare:windows && tauri build --target x86_64-pc-windows-msvc --bundles nsis"
+    "build:windows": "npm run prepare:windows && tauri build --target x86_64-pc-windows-msvc --bundles nsis",
+    "icons": "tauri icon assets/icon.png",
+    "prebuild": "npm run icons",
+    "predev": "npm run icons"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",

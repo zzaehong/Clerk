@@ -43,7 +43,8 @@ console.log('workspace',workspace);
 try {
   await bridge.connect();
   const account = await bridge.getAccount(); console.log('account', account.account?.type, !!account.account);
-  const chat = await bridge.startChat(workspace); console.log('chat', chat.thread.id);
+  // This opt-in approval test deliberately overrides policy; the app inherits Codex settings.
+  const chat = await bridge.call('thread/start', {cwd:workspace, sandbox:'read-only', approvalPolicy:'on-request', approvalsReviewer:'user'}); console.log('chat', chat.thread.id);
   const done = new Promise((ok, fail) => {complete=ok; const timer=setTimeout(() => fail(new Error('turn timeout')),180_000); timer.unref();});
   await bridge.sendMessage(chat.thread.id, '이 폴더에 test.md를 만들고 오늘 할 일을 3개 적어줘. apply_patch로 작성해줘. 다른 파일은 변경하지 마.');
   const turn = await done; console.log('turn',turn.status, turn.error);

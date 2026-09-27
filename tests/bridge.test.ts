@@ -10,11 +10,11 @@ function fake(timeout = 200) {
   }},timeout);
   return {bridge,sent,emit(event:TransportEvent){receive(event);}};
 }
-test('initialization precedes calls; correct workspace and approval policy',async () => {
+test('initialization precedes calls; new threads inherit Codex permissions',async () => {
   const f=fake(); await f.bridge.connect();
   assert.deepEqual(f.sent.map(m=>m.method),['initialize','initialized']);
   const pending=f.bridge.startChat('/tmp/work'); const m=f.sent.at(-1)!;
-  assert.equal(m.params.cwd,'/tmp/work'); assert.equal(m.params.approvalPolicy,'untrusted'); assert.equal(m.params.approvalsReviewer,'user');
+  assert.deepEqual(m.params,{cwd:'/tmp/work'});
   f.emit({kind:'message',message:{id:m.id,result:{thread:{id:'abc'}}}});
   assert.equal((await pending).thread.id,'abc'); await f.bridge.disconnect();
 });
@@ -25,6 +25,18 @@ test('server request id zero is retained and never automatically approved',async
   assert.equal(f.sent.length,2); assert.equal(request.id,0);
   await f.bridge.respond(0,{decision:'decline'}); assert.deepEqual(f.sent.at(-1),{id:0,result:{decision:'decline'}});
   await assert.rejects(f.bridge.respond(0,{})); await f.bridge.disconnect();
+});
+test('resume and subsequent turns do not override Codex permissions or add instructions',async()=>{
+  const f=fake(); await f.bridge.connect();
+  for(const [call,method,params] of [
+    [()=>f.bridge.resumeChat('abc','/tmp/work'),'thread/resume',{threadId:'abc',cwd:'/tmp/work'}],
+    [()=>f.bridge.sendMessage('abc','문서를 정리해줘'),'turn/start',{threadId:'abc',input:[{type:'text',text:'문서를 정리해줘',text_elements:[]}]}],
+  ] as const){
+    const pending=call(), message=f.sent.at(-1)!;
+    assert.equal(message.method,method); assert.deepEqual(message.params,params);
+    f.emit({kind:'message',message:{id:message.id,result:{}}}); await pending;
+  }
+  await f.bridge.disconnect();
 });
 test('out of order responses and streaming notifications are independent',async () => {
   const f=fake(); await f.bridge.connect(); const events:string[]=[]; f.bridge.onNotice=n=>events.push(n.method);
@@ -73,6 +85,7 @@ test('login and Windows setup use official APIs without changing global configur
   for(const [call,method,params] of [
     [()=>f.bridge.startLogin(),'account/login/start',{type:'chatgpt'}],
     [()=>f.bridge.cancelLogin('login-1'),'account/login/cancel',{loginId:'login-1'}],
+    [()=>f.bridge.logout(),'account/logout',{}],
     [()=>f.bridge.prepareWindows('C:\\Docs'),'windowsSandbox/setupStart',{mode:'elevated',cwd:'C:\\Docs'}],
   ] as const){
     const pending=call();const m=f.sent.at(-1)!;

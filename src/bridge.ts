@@ -17,6 +17,7 @@ export class CodexBridge {
   private requests = new Set<string | number>();
   private connected = false;
   private diagnostics: string[] = [];
+  serverInfo: {userAgent?: string} = {};
   onNotice: (notice: Notice) => void = () => {};
   private transport: Transport;
   private timeout: number;
@@ -30,6 +31,7 @@ export class CodexBridge {
     this.connected = false;
     this.rejectPending('Codex connection replaced');
     this.diagnostics = [];
+    this.serverInfo = {};
     await this.transport.start(event => {
       if (generation !== this.generation) return;
       if (event.kind === 'closed') {
@@ -52,7 +54,7 @@ export class CodexBridge {
     });
     this.connected = true;
     try {
-      await this.call('initialize', {clientInfo: {name:'clerk', title:'Clerk', version:'0.1.0'}, capabilities:{experimentalApi:true}});
+      this.serverInfo = await this.call('initialize', {clientInfo: {name:'clerk', title:'Clerk', version:'0.3.0'}, capabilities:{experimentalApi:true}});
       await this.transport.write({method:'initialized', params:{}});
     } catch (e) { this.connected = false; await this.transport.stop(); throw e; }
   }
@@ -77,9 +79,10 @@ export class CodexBridge {
   cancelLogin(loginId: string) { return this.call('account/login/cancel', {loginId}); }
   prepareWindows(cwd?: string) { return this.call('windowsSandbox/setupStart', {mode:'elevated', cwd:cwd || null}); }
   getAccount() { return this.call('account/read', {}); }
+  logout() { return this.call('account/logout', {}); }
   getRateLimits() { return this.call('account/rateLimits/read', {}); }
-  startChat(cwd: string) { return this.call('thread/start', {cwd, sandbox:'workspace-write', approvalPolicy:'untrusted', approvalsReviewer:'user'} satisfies ThreadStartParams); }
-  resumeChat(threadId: string, cwd: string) { return this.call('thread/resume', {threadId, cwd, sandbox:'workspace-write', approvalPolicy:'untrusted', approvalsReviewer:'user'} satisfies ThreadResumeParams); }
+  startChat(cwd: string) { return this.call('thread/start', {cwd} satisfies ThreadStartParams); }
+  resumeChat(threadId: string, cwd: string) { return this.call('thread/resume', {threadId, cwd} satisfies ThreadResumeParams); }
   sendMessage(threadId: string, text: string) { return this.call('turn/start', {threadId, input:[{type:'text', text, text_elements:[]}] } satisfies TurnStartParams); }
   interrupt(threadId: string, turnId: string) { return this.call('turn/interrupt', {threadId, turnId}); }
   async disconnect() { ++this.generation; this.connected = false; this.rejectPending('Codex disconnected'); await this.transport.stop(); }
